@@ -268,11 +268,11 @@ BLACK = 0
 async def main():
 #Scrivete qui il vostro codice. Ogni volta che chiamate una funzione mettete await prima
     robot = RobotController(port.A, port.C, accessory_port=port.B)
-    await robot.reset_gyro()    
+    
 
     await robot.accessory_move_degrees(25, velocity=100)
     await robot.drive_straight_safe(distance_cm=33.5, velocity=500)
-    #prima task
+    # task lancio
     await robot.accessory_move_degrees(90, velocity=2000)
     await robot.accessory_move_degrees(-80, velocity=700)
     await robot.accessory_move_degrees(80, velocity=2000)
@@ -285,22 +285,37 @@ async def main():
     await robot.drive_straight_safe(distance_cm=23, velocity=400)
     await robot.turn(60)
     await robot.drive_straight_safe(distance_cm=3, velocity=400)
-    # 2 task
+    # task palle
     await robot.accessory_move_degrees(28, velocity=2000)
     await robot.turn(-40)
-    # 3 task
+    # task sistemare
     await robot.drive_straight_safe(7, velocity= 400)
     await robot.turn(-35)
-    await robot.accessory_move_degrees(-5, velocity=700)
+    await robot.turn(-40)
+    await robot.accessory_move_degrees(40, velocity=600)
+    await robot.drive_straight_safe(80, velocity=400)
+
+    #task carello
+    await robot.accessory_move_degrees(-90, velocity=100)
+    runloop.sleep_ms(200)
     await robot.turn(-30)
+    await robot.accessory_move_degrees(-40, velocity=100)
+    await robot.turn(-37)
+    await robot.drive_straight_safe(distance_cm=1.2, velocity=200)
+    await robot.accessory_move_degrees(70, velocity=2500)
+    await robot.drive_straight_safe(distance_cm=-10, velocity=200)
+
+    #await robot.accessory_move_degrees(-25, velocity=700)
+    #await robot.accessory_move_degrees(40, velocity=100)
+    
+    #await robot.accessory_move_degrees(-100, velocity=1000)
+'''
     await robot.accessory_move_degrees(-105, velocity=700)
     await robot.drive_straight_safe( distance_cm=30, velocity=400)
     await robot.turn(25)
     await robot.drive_straight_safe( distance_cm=-70, velocity=2000)
-    #await robot.accessory_move_degrees(-25, velocity=700)
-    #await robot.accessory_move_degrees(40, velocity=100)
-    #await robot.drive_straight_safe(80, velocity=1000)
-    #await robot.accessory_move_degrees(-100, velocity=1000)
+    '''
+    
 
     
 runloop.run(main()) #fine main
