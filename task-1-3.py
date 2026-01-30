@@ -101,52 +101,77 @@ class RobotController:
         await runloop.until(lambda: abs(self.normalize_angle(self.get_yaw() - target_angle)) < self.deg_tol)
         motor_pair.stop(self.PAIR)
 
-    async def drive_straight_safe(self, distance_cm, velocity=200, target_angle=0, is_global=False, acc_degrees = 0,acc_velocity=0):
-        """
-        Navigazione lineare con controllo di imbardata e monitoraggio stallo simultaneo.
-        Implementa un regolatore Proporzionale: $u(t) = K_p \cdot e(t)$.
-        """
-        if distance_cm == 0: return
+    async def drive_straight_safe(self, distance_cm, velocity=200, target_angle=0, is_global=False, acc_degrees=0, acc_velocity=0):
+            """
+            Versione corretta: muove ruote e braccio insieme gestendo manualmente i gradi.
+            Risolve l'errore di accessibilità verificando la presenza del motore.
+            """
+            if distance_cm == 0: return
 
-        # Conversione CM -> Gradi motore: (distanza / circonferenza) * 360
-        target_motor_deg = round((abs(distance_cm) / self.WHEEL_CIRCUMFERENCE) * 360)
-        actual_velocity = velocity if distance_cm > 0 else -velocity
+            # 1. Setup Ruote
+            target_motor_deg = round((abs(distance_cm) / self.WHEEL_CIRCUMFERENCE) * 360)
+            actual_velocity = velocity if distance_cm > 0 else -velocity
+            ref_angle = self.normalize_angle(target_angle if is_global else (self.get_yaw() + target_angle))
+            start_pos_wheels = motor.relative_position(self.left_port)
 
-        # Impostazione dell'angolo di riferimento (relativo o assoluto)
-        ref_angle = self.normalize_angle(target_angle if is_global else (self.get_yaw() + target_angle))
-        start_pos = motor.relative_position(self.left_port)
+            # 2. Setup Braccio (Solo se la porta è definita e il motore è collegato)
+            acc_done = True
+            acc_start_pos = 0
 
-        # Attivazione asincrona del motore accessorio
-        if self.accessory_port is not None and acc_velocity != 0 and acc_degrees == 0:
-            motor.run(self.accessory_port, acc_velocity)
-            await runloop.sleep_ms(100) # Previene falsi positivi di stallo all'avvio
+            if self.accessory_port is not None:
+                try:
+                    # Leggiamo la posizione iniziale SOLO se il motore risponde
+                    acc_start_pos = motor.relative_position(self.accessory_port)
+                    if acc_degrees != 0:
+                        dir_acc = 1 if acc_degrees > 0 else -1
+                        # Avviamo il motore in modalità "run" (non bloccante)
+                        motor.run(self.accessory_port, abs(acc_velocity) * dir_acc)
+                        acc_done = False
+                except Exception:
+                    # Se il motore non è collegato fisicamente, ignoriamo il braccio
+                    print("Avviso: Motore accessorio non rilevato sulla porta.")
+                    acc_done = True
 
-        # attivazione asincrona del motore accessorio con movimento del braccio in gradi
-        if self.accessory_port is not None and acc_degrees != 0 and acc_velocity != 0:
-            await motor.run_for_degrees(self.accessory_port, acc_degrees, acc_velocity)
+            # 3. Variabili di controllo
+            integral = 0
+            self.ki_gyro = 0.05
+            travelled = 0
 
-        travelled = 0
-        self.safety_trip = False
+            # --- CICLO UNIFICATO ---
+            while travelled < target_motor_deg:
+                # A. Controllo posizione Braccio
+                if not acc_done:
+                    try:
+                        current_acc_pos = motor.relative_position(self.accessory_port)
+                        # Se abbiamo raggiunto i gradi bersaglio, fermiamo il braccio
+                        if abs(current_acc_pos - acc_start_pos) >= abs(acc_degrees):
+                            motor.stop(self.accessory_port, stop=motor.BRAKE)
+                            acc_done = True
+                        
+                    except:
+                        acc_done = True # Interrompiamo il controllo se il motore viene staccato
+                        
 
-        while travelled < target_motor_deg:
-            # Controllo di sicurezza: se il braccio si blocca, ferma tutto il robot
-            if acc_velocity != 0 and self.check_accessory_stall():
-                self.safety_trip = True
-                break
+                # B. Navigazione con Giroscopio (PI Control)
+                error = self.normalize_angle(self.get_yaw() - ref_angle)
+                integral += error
+                correction = round(self.kp_gyro * error + self.ki_gyro * integral)
 
-            # Calcolo dell'errore di traiettoria e correzione tramite motor_pair.move
-            error = self.normalize_angle(self.get_yaw() - ref_angle)
-            correction = round(self.kp_gyro * error) if actual_velocity > 0 else round(-self.kp_gyro * error)
-            motor_pair.move(self.PAIR, -correction, velocity=actual_velocity)
+                # Applichiamo la correzione in base alla direzione
+                steering = -correction if actual_velocity > 0 else correction
+                motor_pair.move(self.PAIR, steering, velocity=actual_velocity)
 
-            # Aggiornamento distanza percorsa tramite encoder
-            travelled = abs(motor.relative_position(self.left_port) - start_pos)
-            await runloop.sleep_ms(10)
+                # C. Aggiornamento distanza percorsa
+                travelled = abs(motor.relative_position(self.left_port) - start_pos_wheels)
+                await runloop.sleep_ms(10)
 
-        # Arresto del sistema con frenata intelligente
-        motor_pair.stop(self.PAIR, stop=motor.SMART_BRAKE)
-        if self.accessory_port is not None: motor.stop(self.accessory_port, stop=motor.BRAKE)
-        return not self.safety_trip
+            # 4. Stop Finale per tutto
+            motor_pair.stop(self.PAIR, stop=motor.SMART_BRAKE)
+            if self.accessory_port is not None:
+                try: motor.stop(self.accessory_port, stop=motor.BRAKE)
+                except: pass
+
+            return True
 
     # --- SISTEMA DI PERCEZIONE (COLORE E LINE FOLLOWING) ---
 
@@ -270,40 +295,55 @@ async def main():
     robot = RobotController(port.A, port.C, accessory_port=port.B)
     
 
-    await robot.accessory_move_degrees(25, velocity=100)
-    await robot.drive_straight_safe(distance_cm=33.5, velocity=500)
+    await robot.accessory_move_degrees(27, velocity=100)
+    await robot.drive_straight_safe(distance_cm=35.5, velocity=500)
     # task lancio
     await robot.accessory_move_degrees(90, velocity=2000)
     await robot.accessory_move_degrees(-80, velocity=700)
     await robot.accessory_move_degrees(80, velocity=2000)
-    await robot.accessory_move_degrees(-80, velocity=600)
+    await robot.accessory_move_degrees(-80, velocity=900)
     await robot.accessory_move_degrees(80, velocity=2000)
-    await robot.accessory_move_degrees(-80, velocity=400)
+    await robot.accessory_move_degrees(-80, velocity=90)
     await robot.accessory_move_degrees(80, velocity=2000)
     await robot.accessory_move_degrees(-45, velocity=900)
     await robot.turn(-20)
     await robot.drive_straight_safe(distance_cm=23, velocity=400)
+    await robot.turn(65)
+    await robot.drive_straight_safe(distance_cm=2.5, velocity=400)
+    # task massi
+    await robot.accessory_move_degrees(27, velocity=600)
+    await robot.turn(-55)
+    # task equilibrio
+    await robot.accessory_move_degrees(15, velocity=600)
+    await robot.drive_straight_safe(3.5, velocity= 400)
+    await robot.turn(-70)
+    # task buttare giu
+    await robot.drive_straight_safe(-2, velocity= 400)
+    await robot.turn(10)
+    await robot.accessory_move_degrees(-100, velocity=600)
+    await robot.drive_straight_safe(30, velocity=400)
+    await robot.turn(-80)
+    await robot.drive_straight_safe(-2, velocity=400)
+    await robot.accessory_move_degrees(80, velocity=600)
+    await robot.accessory_move_degrees(-80, velocity=600)
+    #task balena
+    await robot.drive_straight_safe(-2, velocity= 400)
+    await robot.turn(40)
+    await robot.drive_straight_safe(32, velocity= 400)
+    await robot.turn(-10)
+    await robot.accessory_move_degrees(80, velocity=2500)
+    await robot.drive_straight_safe(-1, velocity= 400)
+    await robot.accessory_move_degrees(-140, velocity=2500)
     await robot.turn(60)
-    await robot.drive_straight_safe(distance_cm=3, velocity=400)
-    # task palle
-    await robot.accessory_move_degrees(28, velocity=2000)
-    await robot.turn(-40)
-    # task sistemare
-    await robot.drive_straight_safe(7, velocity= 400)
-    await robot.turn(-35)
-    await robot.turn(-40)
-    await robot.accessory_move_degrees(40, velocity=600)
-    await robot.drive_straight_safe(80, velocity=400)
-
-    #task carello
-    await robot.accessory_move_degrees(-90, velocity=100)
+    await robot.drive_straight_safe(26, velocity=400, acc_degrees=45, acc_velocity=100)
+    # task carrello
+    await robot.accessory_move_degrees(-10, velocity=100)
     runloop.sleep_ms(200)
     await robot.turn(-30)
     await robot.accessory_move_degrees(-40, velocity=100)
     await robot.turn(-37)
     await robot.drive_straight_safe(distance_cm=1.2, velocity=200)
-    await robot.accessory_move_degrees(70, velocity=2500)
-    await robot.drive_straight_safe(distance_cm=-10, velocity=200)
+    
 
     #await robot.accessory_move_degrees(-25, velocity=700)
     #await robot.accessory_move_degrees(40, velocity=100)
