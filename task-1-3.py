@@ -296,7 +296,7 @@ async def main():
     
 
     await robot.accessory_move_degrees(27, velocity=100)
-    await robot.drive_straight_safe(distance_cm=35.5, velocity=500)
+    await robot.drive_straight_safe(distance_cm=35.7, velocity=500)
     # task lancio
     await robot.accessory_move_degrees(90, velocity=2000)
     await robot.accessory_move_degrees(-80, velocity=700)
@@ -307,15 +307,15 @@ async def main():
     await robot.accessory_move_degrees(80, velocity=2000)
     await robot.accessory_move_degrees(-45, velocity=900)
     await robot.turn(-20)
-    await robot.drive_straight_safe(distance_cm=23, velocity=400)
-    await robot.turn(65)
-    await robot.drive_straight_safe(distance_cm=2.5, velocity=400)
+    await robot.drive_straight_safe(distance_cm=25, velocity=400)
+    await robot.turn(50)
+    await robot.drive_straight_safe(distance_cm=2, velocity=400)
     # task massi
     await robot.accessory_move_degrees(27, velocity=600)
     await robot.turn(-55)
     # task equilibrio
-    await robot.accessory_move_degrees(15, velocity=600)
-    await robot.drive_straight_safe(3.5, velocity= 400)
+    await robot.accessory_move_degrees(35, velocity=600)
+    await robot.drive_straight_safe(2.5, velocity= 400)
     await robot.turn(-70)
     # task buttare giu
     await robot.drive_straight_safe(-2, velocity= 400)
@@ -323,26 +323,33 @@ async def main():
     await robot.accessory_move_degrees(-100, velocity=600)
     await robot.drive_straight_safe(30, velocity=400)
     await robot.turn(-80)
-    await robot.drive_straight_safe(-2, velocity=400)
+    await robot.drive_straight_safe(-3, velocity=400)
     await robot.accessory_move_degrees(80, velocity=600)
     await robot.accessory_move_degrees(-80, velocity=600)
     #task balena
-    await robot.drive_straight_safe(-2, velocity= 400)
+    await robot.drive_straight_safe(-1, velocity= 400)
     await robot.turn(40)
     await robot.drive_straight_safe(32, velocity= 400)
-    await robot.turn(-10)
+    await robot.turn(-14)
     await robot.accessory_move_degrees(80, velocity=2500)
-    await robot.drive_straight_safe(-1, velocity= 400)
-    await robot.accessory_move_degrees(-140, velocity=2500)
+    await robot.drive_straight_safe(3, velocity= 400)
+    await robot.accessory_move_degrees(-160, velocity=2500)
     await robot.turn(60)
-    await robot.drive_straight_safe(26, velocity=400, acc_degrees=45, acc_velocity=100)
+    await robot.drive_straight_safe(26, velocity=400)
     # task carrello
     await robot.accessory_move_degrees(-10, velocity=100)
     runloop.sleep_ms(200)
+    #task buzzico
     await robot.turn(-30)
-    await robot.accessory_move_degrees(-40, velocity=100)
-    await robot.turn(-37)
-    await robot.drive_straight_safe(distance_cm=1.2, velocity=200)
+    await robot.drive_straight_safe(40, velocity=400)
+    await robot.turn(-5)
+    await robot.drive_straight_safe(3, velocity=400)
+    await robot.accessory_move_degrees(-35,velocity=300)
+    await robot.turn(90)
+    await robot.turn(-120)
+    await robot.drive_straight_safe(50, velocity=300)
+
+    await 
     
 
     #await robot.accessory_move_degrees(-25, velocity=700)
