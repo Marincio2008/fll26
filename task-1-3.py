@@ -293,8 +293,7 @@ BLACK = 0
 async def main():
 #Scrivete qui il vostro codice. Ogni volta che chiamate una funzione mettete await prima
     robot = RobotController(port.A, port.C, accessory_port=port.B)
-    
-
+    await robot.reset_gyro()
     await robot.accessory_move_degrees(27, velocity=100)
     await robot.drive_straight_safe(distance_cm=35.7, velocity=500)
     # task lancio
@@ -349,7 +348,6 @@ async def main():
     await robot.turn(-120)
     await robot.drive_straight_safe(50, velocity=300)
 
-    await 
     
 
     #await robot.accessory_move_degrees(-25, velocity=700)
